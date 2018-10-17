@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script type="text/javascript">
+            class Card{
+                constructor(map){
+                    this.image = map.image;
+                    this._value = map.value;
+                    this.suit = map.suit;
+                    this.code = map.code;
+                }
+                get value(){
+                    let calculatedValue = 0; 
+                    switch(this._value){
+                        case "ACE":
+                            calculatedValue = 11;
+                            break;
+                        case "KING":
+                        case "QUEEN":
+                        case "JACK":
+                            calculatedValue = 10;
+                            break;
+                        default:
+                            calculatedValue = parseInt(this._value,10);
+                            break;
+                    }
+                    return calculatedValue;
+                }
+            }
+            class Deck{
+                constructor(map){
+                    this.id = map.deck_id;
+                    this.remaining = map.remaining;
+                }
+            }
+            class Hand{
+                constructor(){
+                    this.cards = [];
+                }
+                addCard(card){
+                    this.cards.push(card);
+                }
+                addCards(cards){
+                    this.cards = this.cards.concat(cards);
+                }
+                get total(){
+                    return this.cards.reduce((total,card)=>total + card.value,0);
+                }
+            }
+            class CardService{
+                constructor(){
+                    this.api = "https://deckofcardsapi.com/api"
+                }
+                newDeck(){
+                    return fetch(`${this.api}/deck/new/shuffle/?deck_count=1`)
+                            .then(response=>response.json());
+                }
+                draw(count,deck){
+                    return fetch(`${this.api}/deck/${deck.id}/draw/?count=${count}`)
+                        .then(response=>response.json())
+                        .then(response=>response.cards.map(card=>new Card(card)));
+                }
+                drawCard(deck){
+                    return this.draw(1,deck).then(cards=>cards[0]);
+                }
+            }
+            class BlackJack{
+                constructor(){
+                    this.dealerHand = new Hand();
+                    this.playerHand = new Hand();
+                    this.cardService = new CardService();
+                    this.cardTemplateElement = document.querySelector("#card");
+                    this.dealerHandElement = document.querySelector("#dealerHand");
+                    this.playerHandElement = document.querySelector("#playerHand");
+                    document.querySelector("#hit").addEventListener("click",()=>this.hit());
+                    document.querySelector("#stay").addEventListener("click",()=>this.stay());
+                }
+                async newGame(){
+                    this.deck = new Deck(await this.cardService.newDeck());
+                    await this.dealStartingHand();
+                    this.renderGame();
+                }
+                async dealStartingHand(){
+                    this.playerHand.addCards(await this.cardService.draw(2,this.deck));
+                    this.dealerHand.addCards(await this.cardService.draw(2,this.deck));
+                }
+                async hit(){
+                    const newCard = await this.cardService.drawCard(this.deck);
+                    this.playerHand.addCard(newCard);
+                    this.renderCard(newCard, this.playerHandElement);
+                    this.renderTotals();
+
+                }
+                renderGame(){
+                    this.renderHands();
+                    this.renderTotals();
+                }
+                renderHands(){
+                    this.dealerHand.cards.forEach(card=>this.renderCard(card,this.dealerHandElement));
+                    this.playerHand.cards.forEach(card=>this.renderCard(card,this.playerHandElement));
+
+                }
+                renderCard(card, handElement){
+                    const cardElement = this.bindCardTemplate(card);
+                    handElement.querySelector(".cards").appendChild(cardElement);
+                }
+                renderTotals(){
+                    this.playerHandElement.querySelector(".total").textContent = this.playerHand.total;
+                    this.dealerHandElement.querySelector(".total").textContent = this.dealerHand.total;
+                }
+                bindCardTemplate(card){
+                    const cardElement = document.importNode(this.cardTemplateElement.content,true);
+                    cardElement.querySelector('img').src = card.image;       
+                    cardElement.querySelector('.card-value').textContent = card.value;
+                    return cardElement;
+                }
+                
+            }
+            document.addEventListener("DOMContentLoaded",function(){
+                new BlackJack().newGame();
+            });
+        </script>
+        <style>
+            .cards{
+                display:flex;
+            }
+        </style>
+    </head>
+    <body>
+        <section id="dealerHand" class="hand">
+            <div class="cards"></div>
+            <h1>Dealer shows:<span class="total"></span></h1>
+        </section>
+        
+        <section id="playerHand" class="hand">
+            <div class="cards"></div>
+            <h1>Player shows:<span class="total"></span></h1> 
+        </section>
+        <button id="hit" class="player-control">Hit</button>
+        <button id="stay" class="player-control">Stay</button>
+        <template id="card">
+            <div class="card">
+                <img src="" alt="Picture of a playing card">
+                <div class="card-value"></div>
+            </div>
+        </template>
+    </body>
+</html>
